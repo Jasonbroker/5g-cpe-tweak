@@ -1,11 +1,40 @@
-import { useState } from 'react'
-import { controlApi } from '../api'
+import { useState, useEffect } from 'react'
+import { controlApi, webhookApi, systemApi, type WebhookConfig } from '../api'
 
 export default function Settings() {
   const [airplaneMode, setAirplaneMode] = useState(false)
   const [dataEnabled, setDataEnabled] = useState(true)
   const [radioMode, setRadioMode] = useState('Auto')
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookEnabled, setWebhookEnabled] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [otaVersion, setOtaVersion] = useState('')
+
+  useEffect(() => {
+    fetchSettings()
+  }, [])
+
+  async function fetchSettings() {
+    try {
+      const [airplaneRes, dataRes, radioRes, webhookRes, otaRes] = await Promise.all([
+        controlApi.getAirplane(),
+        controlApi.getData(),
+        controlApi.getRadioMode(),
+        webhookApi.get(),
+        systemApi.getOtaStatus(),
+      ])
+      if (airplaneRes.data.data) setAirplaneMode(airplaneRes.data.data.enabled)
+      if (dataRes.data.data) setDataEnabled(dataRes.data.data.enabled)
+      if (radioRes.data.data) setRadioMode(radioRes.data.data.mode)
+      if (webhookRes.data.data) {
+        setWebhookUrl(webhookRes.data.data.url)
+        setWebhookEnabled(webhookRes.data.data.enabled)
+      }
+      if (otaRes.data.data) setOtaVersion(otaRes.data.data.current_version)
+    } catch (err) {
+      console.error('Failed to fetch settings:', err)
+    }
+  }
 
   async function handleAirplaneToggle() {
     setLoading(true)
@@ -40,6 +69,41 @@ export default function Settings() {
       console.error('Failed to change radio mode:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleWebhookSave() {
+    setLoading(true)
+    try {
+      await webhookApi.set({ url: webhookUrl, enabled: webhookEnabled })
+      alert('Webhook saved')
+    } catch (err) {
+      console.error('Failed to save webhook:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleWebhookTest() {
+    if (!webhookUrl) return
+    setLoading(true)
+    try {
+      await webhookApi.test(webhookUrl)
+      alert('Webhook test successful')
+    } catch (err) {
+      alert('Webhook test failed')
+      console.error('Failed to test webhook:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleReboot() {
+    if (!confirm('Reboot device?')) return
+    try {
+      await systemApi.reboot()
+    } catch (err) {
+      console.error('Failed to reboot:', err)
     }
   }
 
@@ -94,16 +158,44 @@ export default function Settings() {
       </div>
 
       <div className="card">
-        <h3>System Info</h3>
+        <h3>Webhook (SMS Forwarding)</h3>
+        <div className="webhook-form">
+          <input
+            type="url"
+            placeholder="https://your-webhook-endpoint.com/sms"
+            value={webhookUrl}
+            onChange={e => setWebhookUrl(e.target.value)}
+          />
+          <div className="setting-item">
+            <span>Enable Webhook</span>
+            <button 
+              className={webhookEnabled ? 'active' : ''} 
+              onClick={() => setWebhookEnabled(!webhookEnabled)}
+            >
+              {webhookEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <div className="webhook-actions">
+            <button onClick={handleWebhookSave} disabled={loading}>Save</button>
+            <button onClick={handleWebhookTest} disabled={loading || !webhookUrl}>Test</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>System</h3>
         <div className="info-grid">
           <div className="info-item">
             <span className="label">Version</span>
-            <span className="value">0.1.0</span>
+            <span className="value">{otaVersion || '0.1.0'}</span>
           </div>
           <div className="info-item">
             <span className="label">API Status</span>
             <span className="value status-ok">OK</span>
           </div>
+        </div>
+        <div className="system-actions">
+          <button onClick={handleReboot} className="danger">Reboot Device</button>
         </div>
       </div>
 
@@ -142,6 +234,25 @@ export default function Settings() {
         button.active {
           background: #646cff;
           color: white;
+        }
+        button.danger {
+          background: #f44336;
+          color: white;
+        }
+        .webhook-form {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .webhook-form input {
+          width: 100%;
+        }
+        .webhook-actions {
+          display: flex;
+          gap: 0.5rem;
+        }
+        .system-actions {
+          margin-top: 1rem;
         }
       `}</style>
     </div>

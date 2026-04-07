@@ -186,4 +186,28 @@ export const atApi = {
   getHistory: () => api.get<ApiResponse<AtHistoryItem[]>>('/at/history'),
 }
 
+// ============== Webhook ==============
+export interface WebhookConfig {
+  url: string
+  enabled: boolean
+}
+
+export const webhookApi = {
+  get: () => api.get<ApiResponse<WebhookConfig | null>>('/webhook'),
+  set: (config: WebhookConfig) => api.post('/webhook', config),
+  test: (url: string) => api.post('/webhook/test', { url }),
+}
+
+// ============== System ==============
+export interface OtaStatus {
+  current_version: string
+  latest_version?: string
+  update_available: boolean
+}
+
+export const systemApi = {
+  getOtaStatus: () => api.get<ApiResponse<OtaStatus>>('/system/ota'),
+  reboot: () => api.post('/system/reboot'),
+}
+
 export default api
