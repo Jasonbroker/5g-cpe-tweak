@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/index.ts","./src/pages/atconsole.tsx","./src/pages/call.tsx","./src/pages/dashboard.tsx","./src/pages/network.tsx","./src/pages/sms.tsx","./src/pages/settings.tsx","./src/pages/traffic.tsx"],"version":"5.6.3"}

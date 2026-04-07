@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { controlApi, webhookApi, systemApi, type WebhookConfig } from '../api'
+import { controlApi, webhookApi, systemApi } from '../api'
 
 export default function Settings() {
   const [airplaneMode, setAirplaneMode] = useState(false)
@@ -63,7 +63,7 @@ export default function Settings() {
   async function handleRadioChange(mode: string) {
     setLoading(true)
     try {
-      await controlApi.setRadioMode({ mode })
+      await controlApi.setRadioMode(mode)
       setRadioMode(mode)
     } catch (err) {
       console.error('Failed to change radio mode:', err)
