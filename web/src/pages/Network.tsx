@@ -1,182 +1,205 @@
 import { useEffect, useState } from 'react'
-import { networkApi, controlApi, type NetworkStatus, type SignalStrength, type CellTower } from '../api'
+import { networkApi, type NetworkStatus, type SignalStrength, type CellInfo } from '../api'
+
+function getNetworkClass(tech: string): string {
+  if (tech.includes('5G')) return '5G NR'
+  if (tech.includes('LTE')) return 'LTE'
+  if (tech.includes('WCDMA') || tech.includes('3G')) return 'WCDMA'
+  if (tech.includes('GSM') || tech.includes('2G')) return 'GSM'
+  return 'Unknown'
+}
 
 export default function Network() {
   const [network, setNetwork] = useState<NetworkStatus | null>(null)
   const [signal, setSignal] = useState<SignalStrength | null>(null)
-  const [cells, setCells] = useState<CellTower | null>(null)
-  const [bandLock, setBandLock] = useState<{ enabled: boolean; bands: string[] } | null>(null)
+  const [cells, setCells] = useState<CellInfo[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    async function fetchData() {
+      try {
+        const [networkRes, signalRes, cellsRes] = await Promise.all([
+          networkApi.getStatus(),
+          networkApi.getSignal(),
+          networkApi.getCells(),
+        ])
+        setNetwork(networkRes.data.data ?? null)
+        setSignal(signalRes.data.data ?? null)
+        if (cellsRes.data.data?.cells) {
+          setCells(cellsRes.data.data.cells)
+        }
+      } catch (err) {
+        console.error('Failed to fetch data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
     fetchData()
+    const interval = setInterval(fetchData, 5000)
+    return () => clearInterval(interval)
   }, [])
 
-  async function fetchData() {
-    try {
-      const [networkRes, signalRes, cellsRes, bandRes] = await Promise.all([
-        networkApi.getStatus(),
-        networkApi.getSignal(),
-        networkApi.getCells(),
-        controlApi.getBandLock(),
-      ])
-      setNetwork(networkRes.data.data ?? null)
-      setSignal(signalRes.data.data ?? null)
-      setCells(cellsRes.data.data ?? null)
-      setBandLock(bandRes.data.data ?? null)
-    } catch (err) {
-      console.error('Failed to fetch network data:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function toggleBandLock() {
-    if (!bandLock) return
-    try {
-      await controlApi.setBandLock({ enabled: !bandLock.enabled, bands: bandLock.bands })
-      await fetchData()
-    } catch (err) {
-      console.error('Failed to toggle band lock:', err)
-    }
-  }
-
-  if (loading) return <div className="page">Loading...</div>
+  if (loading) return <div className="page"><div className="loading">Loading...</div></div>
 
   return (
     <div className="page">
-      <h2>Network</h2>
-      
-      <div className="card">
-        <h3>Network Registration</h3>
-        <div className="info-grid">
-          <div className="info-item">
-            <span className="label">Status</span>
-            <span className="value">{network?.status ?? '-'}</span>
+      <div className="page-header">
+        <h2>Network Details</h2>
+        <span className={`badge ${network?.registered ? 'success' : 'error'}`}>
+          {network?.registered ? 'Connected' : 'Disconnected'}
+        </span>
+      </div>
+
+      {/* Network Status Overview */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--spacing-lg)' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+              Network
+            </div>
+            <div className="mono" style={{ 
+              fontSize: '36px', 
+              fontWeight: '700',
+              color: network?.technology?.includes('5G') ? 'var(--accent-purple)' : 'var(--accent-cyan)'
+            }}>
+              {getNetworkClass(network?.technology ?? '')}
+            </div>
           </div>
-          <div className="info-item">
-            <span className="label">Operator</span>
-            <span className="value">{network?.operator ?? '-'}</span>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+              Operator
+            </div>
+            <div style={{ fontSize: '20px', fontWeight: '600' }}>
+              {network?.operator ?? 'N/A'}
+            </div>
+            <div className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              {network?.operator_code ?? ''}
+            </div>
           </div>
-          <div className="info-item">
-            <span className="label">Operator Code</span>
-            <span className="value">{network?.operator_code ?? '-'}</span>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+              Signal
+            </div>
+            <div className="mono" style={{ fontSize: '36px', fontWeight: '700', color: 'var(--accent-green)' }}>
+              {signal?.rssi ?? '--'}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>dBm</div>
           </div>
-          <div className="info-item">
-            <span className="label">Technology</span>
-            <span className="value">{network?.technology ?? '-'}</span>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+              Quality
+            </div>
+            <div className="mono" style={{ fontSize: '36px', fontWeight: '700', color: 'var(--accent-cyan)' }}>
+              {signal?.sinr ?? '--'}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>dB SINR</div>
           </div>
         </div>
       </div>
 
-      <div className="card">
-        <h3>Signal Strength</h3>
-        <div className="info-grid">
-          <div className="info-item">
-            <span className="label">RSSI</span>
-            <span className="value">{signal?.rssi ?? '-'} dBm</span>
+      {/* Signal Details */}
+      <div className="cards-grid">
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Signal Metrics</span>
           </div>
-          <div className="info-item">
-            <span className="label">RSRP</span>
-            <span className="value">{signal?.rsrp ?? '-'} dBm</span>
-          </div>
-          <div className="info-item">
-            <span className="label">RSRQ</span>
-            <span className="value">{signal?.rsrq ?? '-'} dB</span>
-          </div>
-          <div className="info-item">
-            <span className="label">SINR</span>
-            <span className="value">{signal?.sinr ?? '-'} dB</span>
+          <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div className="info-item">
+              <span className="label">RSSI</span>
+              <span className="value">{signal?.rssi ?? '--'} dBm</span>
+            </div>
+            <div className="info-item">
+              <span className="label">RSRP</span>
+              <span className="value">{signal?.rsrp ?? '--'} dBm</span>
+            </div>
+            <div className="info-item">
+              <span className="label">RSRQ</span>
+              <span className="value">{signal?.rsrq ?? '--'} dB</span>
+            </div>
+            <div className="info-item">
+              <span className="label">SINR</span>
+              <span className="value">{signal?.sinr ?? '--'} dB</span>
+            </div>
+            <div className="info-item">
+              <span className="label">Level</span>
+              <span className="value">{signal?.level ?? '--'} / 5</span>
+            </div>
           </div>
         </div>
-        <div className="signal-bars-large">
-          {[1,2,3,4].map(level => (
-            <div 
-              key={level}
-              className={`signal-bar ${level <= (signal?.level ?? 0) ? 'active' : ''}`}
-              style={{ height: `${level * 15 + 10}px` }}
-            />
-          ))}
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Network Status</span>
+          </div>
+          <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div className="info-item">
+              <span className="label">Status</span>
+              <span className="value" style={{ fontSize: '14px' }}>{network?.status ?? 'Unknown'}</span>
+            </div>
+            <div className="info-item">
+              <span className="label">Technology</span>
+              <span className="badge info">{network?.technology ?? 'Unknown'}</span>
+            </div>
+            <div className="info-item">
+              <span className="label">Roaming</span>
+              <span className={`badge ${network?.roaming ? 'warning' : 'success'}`}>
+                {network?.roaming ? 'Yes' : 'No'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Cell Towers */}
       <div className="card">
-        <h3>Cell Info</h3>
-        {cells?.cells.map((cell, idx) => (
-          <div key={idx} className="info-grid">
-            <div className="info-item">
-              <span className="label">Type</span>
-              <span className="value">{cell.type}</span>
-            </div>
-            <div className="info-item">
-              <span className="label">PCI</span>
-              <span className="value">{cell.pci}</span>
-            </div>
-            <div className="info-item">
-              <span className="label">EARFCN</span>
-              <span className="value">{cell.earfcn}</span>
-            </div>
-            <div className="info-item">
-              <span className="label">Band</span>
-              <span className="value">{cell.band ?? '-'}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card">
-        <h3>Band Lock</h3>
-        <div className="setting-item">
-          <span>Enable Band Lock</span>
-          <button 
-            className={bandLock?.enabled ? 'active' : ''} 
-            onClick={toggleBandLock}
-          >
-            {bandLock?.enabled ? 'ON' : 'OFF'}
-          </button>
+        <div className="card-header">
+          <span className="card-title">Cell Towers ({cells.length})</span>
         </div>
-        {bandLock?.bands && bandLock.bands.length > 0 && (
-          <div className="bands-list">
-            <span className="label">Locked Bands:</span>
-            <span>{bandLock.bands.join(', ')}</span>
+        {cells.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 'var(--spacing-lg)' }}>
+            No cell information available
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-muted)', fontWeight: 500 }}>Type</th>
+                  <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-muted)', fontWeight: 500 }}>PCI</th>
+                  <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-muted)', fontWeight: 500 }}>EARFCN</th>
+                  <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-muted)', fontWeight: 500 }}>Band</th>
+                  <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-muted)', fontWeight: 500 }}>RSRP</th>
+                  <th style={{ textAlign: 'left', padding: '8px', color: 'var(--text-muted)', fontWeight: 500 }}>RSRQ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cells.map((cell, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '8px' }}>
+                      <span className="badge info">{cell.type}</span>
+                    </td>
+                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
+                      {cell.pci}
+                    </td>
+                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)' }}>
+                      {cell.earfcn}
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <span className="badge">{cell.band ?? 'N/A'}</span>
+                    </td>
+                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)' }}>
+                      {cell.rsrp != null ? `${cell.rsrp} dBm` : 'N/A'}
+                    </td>
+                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)' }}>
+                      {cell.rsrq != null ? `${cell.rsrq} dB` : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
-
-      <style>{`
-        .signal-bars-large {
-          display: flex;
-          gap: 4px;
-          align-items: flex-end;
-          height: 70px;
-          margin-top: 1rem;
-          justify-content: center;
-        }
-        .signal-bar {
-          width: 20px;
-          background: #333;
-          border-radius: 4px;
-        }
-        .signal-bar.active {
-          background: #646cff;
-        }
-        .setting-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.5rem 0;
-        }
-        .bands-list {
-          margin-top: 0.5rem;
-          padding: 0.5rem;
-          background: #2a2a2a;
-          border-radius: 6px;
-        }
-        button.active {
-          background: #646cff;
-          color: white;
-        }
-      `}</style>
     </div>
   )
 }

@@ -1,14 +1,22 @@
 import { useState, useEffect } from 'react'
 import { controlApi, webhookApi, systemApi } from '../api'
 
+const RADIO_MODES = [
+  { value: 'auto', label: 'Auto', desc: 'All available' },
+  { value: '5g', label: '5G Only', desc: 'NR mode' },
+  { value: '4g', label: '4G Only', desc: 'LTE mode' },
+  { value: '3g', label: '3G Only', desc: 'WCDMA' },
+]
+
 export default function Settings() {
   const [airplaneMode, setAirplaneMode] = useState(false)
   const [dataEnabled, setDataEnabled] = useState(true)
-  const [radioMode, setRadioMode] = useState('Auto')
+  const [radioMode, setRadioMode] = useState('auto')
   const [webhookUrl, setWebhookUrl] = useState('')
   const [webhookEnabled, setWebhookEnabled] = useState(false)
   const [loading, setLoading] = useState(false)
   const [otaVersion, setOtaVersion] = useState('')
+  const [rebootLoading, setRebootLoading] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -36,25 +44,14 @@ export default function Settings() {
     }
   }
 
-  async function handleAirplaneToggle() {
+  async function handleToggle(field: 'airplane' | 'data', value: boolean, setter: (v: boolean) => void) {
     setLoading(true)
     try {
-      await controlApi.setAirplane(!airplaneMode)
-      setAirplaneMode(!airplaneMode)
+      if (field === 'airplane') await controlApi.setAirplane(!value)
+      if (field === 'data') await controlApi.setData(!value)
+      setter(!value)
     } catch (err) {
-      console.error('Failed to toggle airplane mode:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleDataToggle() {
-    setLoading(true)
-    try {
-      await controlApi.setData(!dataEnabled)
-      setDataEnabled(!dataEnabled)
-    } catch (err) {
-      console.error('Failed to toggle data:', err)
+      console.error(`Failed to toggle ${field}:`, err)
     } finally {
       setLoading(false)
     }
@@ -76,7 +73,6 @@ export default function Settings() {
     setLoading(true)
     try {
       await webhookApi.set({ url: webhookUrl, enabled: webhookEnabled })
-      alert('Webhook saved')
     } catch (err) {
       console.error('Failed to save webhook:', err)
     } finally {
@@ -84,177 +80,120 @@ export default function Settings() {
     }
   }
 
-  async function handleWebhookTest() {
-    if (!webhookUrl) return
-    setLoading(true)
-    try {
-      await webhookApi.test(webhookUrl)
-      alert('Webhook test successful')
-    } catch (err) {
-      alert('Webhook test failed')
-      console.error('Failed to test webhook:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function handleReboot() {
-    if (!confirm('Reboot device?')) return
+    if (!confirm('Are you sure you want to reboot the device?')) return
+    setRebootLoading(true)
     try {
       await systemApi.reboot()
     } catch (err) {
       console.error('Failed to reboot:', err)
+    } finally {
+      setRebootLoading(false)
     }
   }
 
   return (
     <div className="page">
-      <h2>Settings</h2>
-      
-      <div className="card">
-        <h3>Network Control</h3>
-        <div className="setting-item">
-          <div className="setting-label">
-            <span className="label">Airplane Mode</span>
-            <span className="desc">Disable all wireless connections</span>
+      <div className="page-header">
+        <h2>Settings</h2>
+      </div>
+
+      {/* Quick Toggles */}
+      <div className="cards-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Airplane Mode</span>
+            <div 
+              className={`toggle ${airplaneMode ? 'active' : ''}`}
+              onClick={() => handleToggle('airplane', airplaneMode, setAirplaneMode)}
+            />
           </div>
-          <button 
-            className={airplaneMode ? 'active' : ''} 
-            onClick={handleAirplaneToggle}
-            disabled={loading}
-          >
-            {airplaneMode ? 'ON' : 'OFF'}
-          </button>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+            Disable all wireless connections
+          </p>
         </div>
-        <div className="setting-item">
-          <div className="setting-label">
-            <span className="label">Mobile Data</span>
-            <span className="desc">Enable cellular data connection</span>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Mobile Data</span>
+            <div 
+              className={`toggle ${dataEnabled ? 'active' : ''}`}
+              onClick={() => handleToggle('data', dataEnabled, setDataEnabled)}
+            />
           </div>
-          <button 
-            className={dataEnabled ? 'active' : ''} 
-            onClick={handleDataToggle}
-            disabled={loading}
-          >
-            {dataEnabled ? 'ON' : 'OFF'}
-          </button>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+            Enable cellular data connection
+          </p>
         </div>
       </div>
 
-      <div className="card">
-        <h3>Radio Mode</h3>
-        <div className="radio-modes">
-          {['4G', '5G', 'Auto'].map(mode => (
+      {/* Radio Mode */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+        <div className="card-header">
+          <span className="card-title">Radio Mode</span>
+        </div>
+        <div className="radio-mode-group">
+          {RADIO_MODES.map(mode => (
             <button
-              key={mode}
-              className={radioMode === mode ? 'active' : ''}
-              onClick={() => handleRadioChange(mode)}
+              key={mode.value}
+              className={`radio-mode-btn ${radioMode === mode.value ? 'active' : ''}`}
+              onClick={() => handleRadioChange(mode.value)}
               disabled={loading}
             >
-              {mode}
+              <div>{mode.label}</div>
+              <div style={{ fontSize: '10px', opacity: 0.7 }}>{mode.desc}</div>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="card">
-        <h3>Webhook (SMS Forwarding)</h3>
-        <div className="webhook-form">
+      {/* Webhook */}
+      <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+        <div className="card-header">
+          <span className="card-title">Webhook</span>
+          <div 
+            className={`toggle ${webhookEnabled ? 'active' : ''}`}
+            onClick={() => setWebhookEnabled(!webhookEnabled)}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
           <input
-            type="url"
-            placeholder="https://your-webhook-endpoint.com/sms"
+            type="text"
             value={webhookUrl}
             onChange={e => setWebhookUrl(e.target.value)}
+            placeholder="https://example.com/webhook"
+            style={{ flex: 1 }}
           />
-          <div className="setting-item">
-            <span>Enable Webhook</span>
-            <button 
-              className={webhookEnabled ? 'active' : ''} 
-              onClick={() => setWebhookEnabled(!webhookEnabled)}
-            >
-              {webhookEnabled ? 'ON' : 'OFF'}
-            </button>
-          </div>
-          <div className="webhook-actions">
-            <button onClick={handleWebhookSave} disabled={loading}>Save</button>
-            <button onClick={handleWebhookTest} disabled={loading || !webhookUrl}>Test</button>
-          </div>
+          <button onClick={handleWebhookSave} disabled={loading} className="primary">
+            Save
+          </button>
         </div>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 'var(--spacing-sm)' }}>
+          Receive notifications on data usage, connection changes, etc.
+        </p>
       </div>
 
+      {/* System */}
       <div className="card">
-        <h3>System</h3>
-        <div className="info-grid">
+        <div className="card-header">
+          <span className="card-title">System</span>
+        </div>
+        <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 'var(--spacing-lg)' }}>
           <div className="info-item">
-            <span className="label">Version</span>
-            <span className="value">{otaVersion || '0.1.0'}</span>
+            <span className="label">Firmware Version</span>
+            <span className="value mono" style={{ fontSize: '14px' }}>{otaVersion || 'Unknown'}</span>
           </div>
           <div className="info-item">
-            <span className="label">API Status</span>
-            <span className="value status-ok">OK</span>
+            <span className="label">Device</span>
+            <span className="value">UDX710</span>
           </div>
         </div>
-        <div className="system-actions">
-          <button onClick={handleReboot} className="danger">Reboot Device</button>
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+          <button onClick={handleReboot} disabled={rebootLoading} className="danger">
+            {rebootLoading ? 'Rebooting...' : 'Reboot Device'}
+          </button>
         </div>
       </div>
-
-      <style>{`
-        .setting-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.75rem 0;
-          border-bottom: 1px solid #333;
-        }
-        .setting-item:last-child {
-          border-bottom: none;
-        }
-        .setting-label {
-          display: flex;
-          flex-direction: column;
-        }
-        .setting-label .label {
-          font-weight: 500;
-        }
-        .setting-label .desc {
-          font-size: 0.75rem;
-          color: #666;
-        }
-        .radio-modes {
-          display: flex;
-          gap: 0.5rem;
-        }
-        .radio-modes button {
-          flex: 1;
-        }
-        .status-ok {
-          color: #4caf50;
-        }
-        button.active {
-          background: #646cff;
-          color: white;
-        }
-        button.danger {
-          background: #f44336;
-          color: white;
-        }
-        .webhook-form {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-        .webhook-form input {
-          width: 100%;
-        }
-        .webhook-actions {
-          display: flex;
-          gap: 0.5rem;
-        }
-        .system-actions {
-          margin-top: 1rem;
-        }
-      `}</style>
     </div>
   )
 }
