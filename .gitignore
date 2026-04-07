@@ -1,0 +1,28 @@
+# Rust
+backend/target/
+backend/Cargo.lock
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Build artifacts
+www/
+release/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary
+*.tmp
