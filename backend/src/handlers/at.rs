@@ -1,14 +1,14 @@
-//! AT 指令处理
+//! AT 指令处理 - 真实 oFono 实现
 
 use axum::{Json, extract::State};
 use std::sync::Arc;
-use std::sync::Mutex;
 use tokio::sync::RwLock;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{AtRequest, AtResponse, AtHistoryItem};
 use crate::response::ApiResponse;
+use crate::ofono;
 
 /// AT 指令历史（内存存储，最多 100 条）
 pub struct AtHistory {
@@ -43,17 +43,13 @@ pub async fn send_at(
 ) -> Json<ApiResponse<AtResponse>> {
     let cmd = req.cmd.trim().to_string();
     
-    // TODO: 实际通过 oFono D-Bus 发送 AT 指令
-    // 目前模拟响应
-    let result = match cmd.as_str() {
-        "AT+CSQ" => "+CSQ: 20,99".to_string(),
-        "AT+CGMR" => "11.217.01.01.01".to_string(),
-        "AT+CGSN" => "867062040123456".to_string(),
-        "AT+ICCID" => "+ICCID: 898602xxxxxxxxxxxxxxx".to_string(),
-        "AT+COPS?" => "+COPS: 0,0,\"CHINA MOBILE\",7".to_string(),
-        "AT+CREG?" => "+CREG: 0,1".to_string(),
-        "AT+CGATT?" => "+CGATT: 1".to_string(),
-        _ => "OK".to_string(),
+    // 通过 oFono D-Bus 发送真实 AT 指令
+    let result = match send_at_command(&cmd).await {
+        Ok(response) => response,
+        Err(e) => {
+            tracing::warn!("AT command failed: {}", e);
+            format!("ERROR: {}", e)
+        }
     };
     
     // 添加到历史
@@ -61,6 +57,13 @@ pub async fn send_at(
     history.add(cmd.clone(), result.clone());
     
     Json(ApiResponse::ok_with_data("AT command executed", AtResponse { result }))
+}
+
+/// 发送 AT 指令到 Modem
+async fn send_at_command(cmd: &str) -> Result<String, anyhow::Error> {
+    let conn = ofono::get_connection().await?;
+    let response = ofono::send_at(&conn, cmd).await?;
+    Ok(response)
 }
 
 /// 获取 AT 指令历史

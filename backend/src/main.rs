@@ -19,6 +19,7 @@ use tower_http::fs::ServeDir;
 use tracing::{info, warn, Level};
 use tracing_subscriber::fmt::format::FmtSpan;
 use clap::Parser;
+use tokio::sync::RwLock;
 
 mod handlers;
 mod models;
@@ -26,6 +27,7 @@ mod response;
 mod ofono;
 
 use response::ApiResponse;
+use handlers::at::AtHistory;
 
 #[derive(Parser, Debug)]
 #[command(name = "cpe-ctrl")]
@@ -130,8 +132,12 @@ async fn main() -> anyhow::Result<()> {
     
     info!("CPE Ctrl starting on {}", bind_addr);
     
+    // 创建 AT 指令历史状态
+    let at_history = Arc::new(RwLock::new(AtHistory::new()));
+    
     // 构建路由
     let app = Router::new()
+        .with_state(at_history)
         // API 路由
         .route("/api/health", get(health))
         .route("/api/at/send", post(handlers::at::send_at))
