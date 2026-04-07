@@ -1,6 +1,6 @@
 //! 短信处理 - 真实 oFono 实现
 
-use axum::{Json};
+use axum::Json;
 use serde::{Deserialize, Serialize};
 use crate::models::SmsMessage;
 use crate::response::ApiResponse;
@@ -78,8 +78,7 @@ async fn send_real_sms(to: &str, body: &str) -> Result<i32, anyhow::Error> {
 }
 
 /// 删除短信
-pub async fn delete_sms(Json(req): Json<DeleteSmsRequest>) -> Json<ApiResponse<()>> {
+pub async fn delete_sms(Json(_req): Json<DeleteSmsRequest>) -> Json<ApiResponse<()>> {
     // TODO: 通过 oFono 删除短信
-    // 目前 oFono 不支持直接删除短信，需要通过 AT 指令
     Json(ApiResponse::ok("SMS deleted"))
 }

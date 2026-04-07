@@ -28,6 +28,7 @@ mod ofono;
 
 use response::ApiResponse;
 use handlers::at::AtHistory;
+use handlers::webhook::WebhookState;
 
 #[derive(Parser, Debug)]
 #[command(name = "cpe-ctrl")]
@@ -58,7 +59,7 @@ fn get_www_dir() -> PathBuf {
 }
 
 /// SPA fallback handler
-async fn spa_fallback(uri: Uri, headers: HeaderMap) -> impl IntoResponse {
+async fn spa_fallback(uri: Uri, _headers: HeaderMap) -> impl IntoResponse {
     let path = uri.path();
     
     // API 路由返回 404
@@ -129,38 +130,52 @@ async fn main() -> anyhow::Result<()> {
     // 解析命令行参数
     let args = Args::parse();
     let bind_addr: SocketAddr = format!("{}:{}", args.host, args.port).parse()?;
-    
     info!("CPE Ctrl starting on {}", bind_addr);
     
-    // 创建 AT 指令历史状态
+    // 创建共享状态
     let at_history = Arc::new(RwLock::new(AtHistory::new()));
+    let webhook_state = Arc::new(RwLock::new(WebhookState::new()));
     
     // 构建路由
     let app = Router::new()
-        .with_state(at_history)
+        .with_state(at_history.clone())
+        .with_state(webhook_state.clone())
         // API 路由
         .route("/api/health", get(health))
+        // AT 指令
         .route("/api/at/send", post(handlers::at::send_at))
         .route("/api/at/history", get(handlers::at::get_at_history))
+        // 设备
         .route("/api/device/info", get(handlers::device::get_device_info))
         .route("/api/device/sim", get(handlers::device::get_sim_info))
+        // 网络
         .route("/api/network/status", get(handlers::network::get_network_status))
         .route("/api/network/signal", get(handlers::network::get_signal_strength))
         .route("/api/network/cells", get(handlers::network::get_cells))
+        // 控制
         .route("/api/control/data", get(handlers::control::get_data).post(handlers::control::set_data))
         .route("/api/control/airplane", get(handlers::control::get_airplane).post(handlers::control::set_airplane))
         .route("/api/control/radio", get(handlers::control::get_radio_mode).post(handlers::control::set_radio_mode))
         .route("/api/control/band-lock", get(handlers::control::get_band_lock).post(handlers::control::set_band_lock))
         .route("/api/control/cell-lock", get(handlers::control::get_cell_lock).post(handlers::control::set_cell_lock))
+        // 流量
         .route("/api/traffic/stats", get(handlers::traffic::get_traffic_stats))
         .route("/api/traffic/limit", get(handlers::traffic::get_traffic_limit).post(handlers::traffic::set_traffic_limit))
+        // 短信
         .route("/api/sms/list", get(handlers::sms::get_sms_list))
         .route("/api/sms/send", post(handlers::sms::send_sms))
         .route("/api/sms/delete", post(handlers::sms::delete_sms))
+        // 通话
         .route("/api/call/list", get(handlers::call::get_call_list))
         .route("/api/call/dial", post(handlers::call::dial))
         .route("/api/call/hangup", post(handlers::call::hangup))
         .route("/api/call/answer", post(handlers::call::answer))
+        // Webhook
+        .route("/api/webhook", get(handlers::webhook::get_webhook).post(handlers::webhook::set_webhook))
+        .route("/api/webhook/test", post(handlers::webhook::test_webhook))
+        // 系统
+        .route("/api/system/ota", get(handlers::system::get_ota_status).post(handlers::system::ota_upload))
+        .route("/api/system/reboot", post(handlers::system::reboot))
         // CORS
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
         // 静态文件服务或 SPA fallback

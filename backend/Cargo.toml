@@ -33,6 +33,12 @@ clap = { version = "4", features = ["derive"] }
 # Async utilities
 futures = "0.3"
 
+# HTTP client (for webhook)
+reqwest = { version = "0.12", features = ["json"] }
+
+# Time
+chrono = "0.4"
+
 [profile.release]
 opt-level = "z"  # Optimize for size
 lto = true
