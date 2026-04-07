@@ -146,6 +146,15 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/control/radio", get(handlers::control::get_radio_mode).post(handlers::control::set_radio_mode))
         .route("/api/control/band-lock", get(handlers::control::get_band_lock).post(handlers::control::set_band_lock))
         .route("/api/control/cell-lock", get(handlers::control::get_cell_lock).post(handlers::control::set_cell_lock))
+        .route("/api/traffic/stats", get(handlers::traffic::get_traffic_stats))
+        .route("/api/traffic/limit", get(handlers::traffic::get_traffic_limit).post(handlers::traffic::set_traffic_limit))
+        .route("/api/sms/list", get(handlers::sms::get_sms_list))
+        .route("/api/sms/send", post(handlers::sms::send_sms))
+        .route("/api/sms/delete", post(handlers::sms::delete_sms))
+        .route("/api/call/list", get(handlers::call::get_call_list))
+        .route("/api/call/dial", post(handlers::call::dial))
+        .route("/api/call/hangup", post(handlers::call::hangup))
+        .route("/api/call/answer", post(handlers::call::answer))
         // CORS
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
         // 静态文件服务或 SPA fallback
