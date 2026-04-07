@@ -143,6 +143,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/network/cells", get(handlers::network::get_cells))
         .route("/api/control/data", get(handlers::control::get_data).post(handlers::control::set_data))
         .route("/api/control/airplane", get(handlers::control::get_airplane).post(handlers::control::set_airplane))
+        .route("/api/control/radio", get(handlers::control::get_radio_mode).post(handlers::control::set_radio_mode))
+        .route("/api/control/band-lock", get(handlers::control::get_band_lock).post(handlers::control::set_band_lock))
+        .route("/api/control/cell-lock", get(handlers::control::get_cell_lock).post(handlers::control::set_cell_lock))
         // CORS
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
         // 静态文件服务或 SPA fallback

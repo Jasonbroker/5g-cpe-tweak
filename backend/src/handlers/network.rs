@@ -30,7 +30,7 @@ pub async fn get_signal_strength() -> Json<ApiResponse<SignalStrength>> {
 
 /// 获取小区信息
 pub async fn get_cells() -> Json<ApiResponse<CellTower>> {
-    // TODO: 从 oFono 获取真实数据
+    // TODO: 从 oFono/NetworkMonitor 获取真实数据
     Json(ApiResponse::ok_with_data("Cell info retrieved", CellTower {
         cells: vec![
             CellInfo {
