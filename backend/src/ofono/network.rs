@@ -1,0 +1,1 @@
+//! NetworkRegistration 接口
