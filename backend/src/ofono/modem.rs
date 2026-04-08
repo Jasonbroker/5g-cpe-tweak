@@ -4,18 +4,20 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use zbus::{Connection, Proxy, OwnedValue};
+use zbus::{Connection, Proxy};
+use zbus::zvariant::OwnedValue;
 
 /// 全局 D-Bus 锁，防止 oFono 并发错误
 static DBUS_LOCK: Mutex<()> = Mutex::const_new(());
 
 /// 执行时持有全局 D-Bus 锁
-async fn with_serial<F, T>(f: F) -> T
+pub async fn with_serial<F, Fut, T>(f: F) -> T
 where
-    F: async FnOnce() -> T,
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = T>,
 {
     let _guard = DBUS_LOCK.lock().await;
-    f()
+    f().await
 }
 
 /// 获取 D-Bus 连接

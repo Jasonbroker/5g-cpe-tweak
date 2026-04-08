@@ -2,7 +2,8 @@
 
 use anyhow::Result;
 use std::collections::HashMap;
-use zbus::{Connection, Proxy, OwnedValue};
+use zbus::{Connection, Proxy};
+use zbus::zvariant::OwnedValue;
 
 use super::modem::with_serial;
 

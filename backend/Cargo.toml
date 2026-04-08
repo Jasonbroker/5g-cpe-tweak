@@ -7,7 +7,7 @@ description = "5G CPE Management System for Huawei 5G Communication Case"
 
 [dependencies]
 # Web framework
-axum = "0.7"
+axum = { version = "0.7", features = ["tokio"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
@@ -34,7 +34,7 @@ clap = { version = "4", features = ["derive"] }
 futures = "0.3"
 
 # HTTP client (for webhook)
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # Time
 chrono = "0.4"
