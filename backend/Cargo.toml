@@ -7,17 +7,17 @@ description = "5G CPE Management System for Huawei 5G Communication Case"
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["tokio"] }
+axum = { version = "0.8", features = ["tokio", "macros"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # D-Bus
-zbus = "2"
+zbus = { version = "5", default-features = false, features = ["tokio"] }
 
 # Error handling
 anyhow = "1"

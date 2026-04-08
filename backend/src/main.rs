@@ -181,7 +181,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/webhook", get(handlers::webhook::get_webhook).post(handlers::webhook::set_webhook))
         .route("/api/webhook/test", post(handlers::webhook::test_webhook))
         // 系统
-        .route("/api/system/ota", get(handlers::system::get_ota_status).post(handlers::system::ota_upload))
+
         .route("/api/system/reboot", post(handlers::system::reboot))
         // CORS
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
