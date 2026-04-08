@@ -22,10 +22,12 @@ export interface DeviceInfo {
 
 export interface SimInfo {
   present: boolean
+  ready: boolean
   imsi?: string
   iccid?: string
   locked: boolean
   operator?: string
+  status?: string
 }
 
 export const deviceApi = {
@@ -40,6 +42,7 @@ export interface NetworkStatus {
   operator?: string
   operator_code?: string
   technology?: string
+  roaming?: boolean
 }
 
 export interface SignalStrength {
@@ -48,6 +51,9 @@ export interface SignalStrength {
   rsrq?: number
   sinr?: number
   level: number
+  pci?: number
+  earfcn?: number
+  band?: string
 }
 
 export interface CellInfo {

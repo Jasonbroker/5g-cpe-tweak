@@ -2,7 +2,8 @@
 
 use anyhow::Result;
 use std::collections::HashMap;
-use zbus::{Connection, Proxy, OwnedValue};
+use zbus::{Connection, Proxy};
+use zbus::zvariant::OwnedValue;
 
 use super::modem::with_serial;
 
@@ -33,14 +34,14 @@ impl<'a> VoiceCallManagerProxy<'a> {
     /// 挂断
     pub async fn hangup(&self, path: &str) -> Result<()> {
         let proxy = Proxy::new(&self.proxy.connection(), "org.ofono", path, "org.ofono.VoiceCall").await?;
-        proxy.call("Hangup", &()).await?;
+        proxy.call::<_, _, ()>("Hangup", &()).await?;
         Ok(())
     }
 
     /// 接听
     pub async fn answer(&self, path: &str) -> Result<()> {
         let proxy = Proxy::new(&self.proxy.connection(), "org.ofono", path, "org.ofono.VoiceCall").await?;
-        proxy.call("Answer", &()).await?;
+        proxy.call::<_, _, ()>("Answer", &()).await?;
         Ok(())
     }
 }

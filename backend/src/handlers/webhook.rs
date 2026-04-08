@@ -1,6 +1,6 @@
 //! Webhook 处理 - 短信转发
 
-use axum::{Json, extract::State};
+use axum::{Json, extract::Extension};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
@@ -27,8 +27,9 @@ pub type WebhookStateRef = Arc<RwLock<WebhookState>>;
 
 /// 获取 Webhook 配置
 pub async fn get_webhook(
-    State(state): State<WebhookStateRef>,
+    Extension(state): Extension<super::AppState>,
 ) -> Json<ApiResponse<Option<WebhookConfig>>> {
+    let state = state.webhook.clone();
     let state = state.read().await;
     Json(ApiResponse::ok_with_data("Webhook config retrieved", state.config.clone()))
 }
@@ -41,9 +42,10 @@ pub struct SetWebhookRequest {
 
 /// 设置 Webhook 配置
 pub async fn set_webhook(
-    State(state): State<WebhookStateRef>,
+    Extension(state): Extension<super::AppState>,
     Json(req): Json<SetWebhookRequest>,
 ) -> Json<ApiResponse<WebhookConfig>> {
+    let state = state.webhook.clone();
     let config = WebhookConfig {
         url: req.url,
         enabled: req.enabled,

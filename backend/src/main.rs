@@ -6,29 +6,20 @@
 use axum::{
     routing::{get, post},
     Router,
-    response::IntoResponse,
-    http::{StatusCode, Uri, HeaderMap},
-    extract::Query,
+    response::Response,
+    http::{StatusCode, Uri, HeaderMap, header::CONTENT_TYPE},
+    extract::Extension,
     Json,
 };
+use axum::body::Body;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{CorsLayer, Any};
-use tower_http::fs::ServeDir;
-use tracing::{info, warn, Level};
+use tracing::{info, Level};
 use tracing_subscriber::fmt::format::FmtSpan;
 use clap::Parser;
 use tokio::sync::RwLock;
-
-mod handlers;
-mod models;
-mod response;
-mod ofono;
-
-use response::ApiResponse;
-use handlers::at::AtHistory;
-use handlers::webhook::WebhookState;
 
 #[derive(Parser, Debug)]
 #[command(name = "cpe-ctrl")]
@@ -51,6 +42,16 @@ struct Args {
     static_path: Option<PathBuf>,
 }
 
+mod handlers;
+mod models;
+mod response;
+mod ofono;
+
+use response::ApiResponse;
+use handlers::at::AtHistory;
+use handlers::webhook::WebhookState;
+use handlers::AppState;
+
 /// 获取 www 目录路径
 fn get_www_dir() -> PathBuf {
     let exe_path = std::env::current_exe().expect("Failed to get executable path");
@@ -59,12 +60,17 @@ fn get_www_dir() -> PathBuf {
 }
 
 /// SPA fallback handler
-async fn spa_fallback(uri: Uri, _headers: HeaderMap) -> impl IntoResponse {
+async fn spa_fallback(uri: Uri, _headers: HeaderMap) -> Response<Body> {
     let path = uri.path();
     
     // API 路由返回 404
     if path.starts_with("/api/") {
-        return (StatusCode::NOT_FOUND, Json(ApiResponse::<()>::error("API endpoint not found")));
+        let body = serde_json::to_string(&ApiResponse::<()>::error("API endpoint not found")).unwrap();
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(body))
+            .unwrap();
     }
     
     // 获取 www 目录
@@ -92,25 +98,26 @@ async fn spa_fallback(uri: Uri, _headers: HeaderMap) -> impl IntoResponse {
             _ => "application/octet-stream",
         };
         
-        return (
-            StatusCode::OK,
-            [(axum::http::header::CONTENT_TYPE, content_type)],
-            content,
-        ).into_response();
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header(CONTENT_TYPE, content_type)
+            .body(axum::body::Body::from(content))
+            .unwrap();
     }
     
     // 文件不存在，返回 index.html (SPA)
     let index_path = www_dir.join("index.html");
     match tokio::fs::read(&index_path).await {
-        Ok(content) => (
-            StatusCode::OK,
-            [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-            content,
-        ).into_response(),
-        Err(_) => (
-            StatusCode::NOT_FOUND,
-            format!("index.html not found at {:?}. Please build the frontend first.", index_path),
-        ).into_response(),
+        Ok(content) => Response::builder()
+            .status(StatusCode::OK)
+            .header(CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(axum::body::Body::from(content))
+            .unwrap(),
+        Err(_) => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(CONTENT_TYPE, "text/plain")
+            .body(axum::body::Body::from(format!("index.html not found at {:?}. Please build the frontend first.", index_path)))
+            .unwrap(),
     }
 }
 
@@ -135,12 +142,12 @@ async fn main() -> anyhow::Result<()> {
     // 创建共享状态
     let at_history = Arc::new(RwLock::new(AtHistory::new()));
     let webhook_state = Arc::new(RwLock::new(WebhookState::new()));
+    let app_state = AppState::new(at_history.clone(), webhook_state.clone());
     
-    // 构建路由
+    // 构建路由 - 使用 Extension 注入状态
     let app = Router::new()
-        .with_state(at_history.clone())
-        .with_state(webhook_state.clone())
-        // API 路由
+        .layer(Extension(app_state))
+        // 健康检查
         .route("/api/health", get(health))
         // AT 指令
         .route("/api/at/send", post(handlers::at::send_at))
@@ -185,7 +192,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     info!("CPE Ctrl listening on {}", bind_addr);
     
-    axum::serve(listener, app).await?;
+    axum::serve(listener, Router::into_make_service(app)).await?;
     
     Ok(())
 }

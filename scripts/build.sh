@@ -82,17 +82,20 @@ if [ "$BUILD_BACKEND" = true ]; then
     
     # Check cross-compiler
     if ! command -v aarch64-unknown-linux-musl-gcc &> /dev/null; then
-        echo "⚠️  Warning: aarch64-unknown-linux-musl-gcc not found"
-        echo "    Install with: brew tap messense/macos-cross-toolchains && brew install aarch64-unknown-linux-musl"
-        echo "    Building for native platform instead..."
-        cargo build --release
-    else
-        # Set cross-compile environment
-        export CC_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-gcc
-        export CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
-        
-        cargo build --release --target aarch64-unknown-linux-musl
+        echo "❌ Error: aarch64-unknown-linux-musl-gcc not found"
+        echo ""
+        echo "Install with:"
+        echo "  brew tap messense/macos-cross-toolchains"
+        echo "  brew install aarch64-unknown-linux-musl"
+        exit 1
     fi
+    
+    # Set cross-compile environment
+    export CC_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-gcc
+    export CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
+    export AR_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-ar
+    
+    cargo build --release --target aarch64-unknown-linux-musl
     
     # Find binary
     if [ -f "target/aarch64-unknown-linux-musl/release/cpe-ctrl" ]; then

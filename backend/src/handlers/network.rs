@@ -30,7 +30,7 @@ async fn get_real_network_status() -> Result<NetworkStatus, anyhow::Error> {
     let (name, code, status_str) = (net_info.name, net_info.code, net_info.status);
     
     let registered = status_str == "registered" || status_str == "roaming";
-    let technology = Some(detect_technology(&conn).await.unwrap_or_else(|| "LTE".to_string()));
+    let technology = Some(detect_technology(&conn).await.unwrap_or_else(|_| "LTE".to_string()));
     
     Ok(NetworkStatus {
         registered,

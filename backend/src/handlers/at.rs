@@ -1,6 +1,6 @@
 //! AT 指令处理 - 真实 oFono 实现
 
-use axum::{Json, extract::State};
+use axum::{Json, extract::Extension};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::Utc;
@@ -38,9 +38,10 @@ pub type AtHistoryState = Arc<RwLock<AtHistory>>;
 
 /// 发送 AT 指令
 pub async fn send_at(
-    State(history): State<AtHistoryState>,
+    Extension(state): Extension<super::AppState>,
     Json(req): Json<AtRequest>,
 ) -> Json<ApiResponse<AtResponse>> {
+    let history = state.at_history.clone();
     let cmd = req.cmd.trim().to_string();
     
     // 通过 oFono D-Bus 发送真实 AT 指令
@@ -68,8 +69,9 @@ async fn send_at_command(cmd: &str) -> Result<String, anyhow::Error> {
 
 /// 获取 AT 指令历史
 pub async fn get_at_history(
-    State(history): State<AtHistoryState>,
+    Extension(state): Extension<super::AppState>,
 ) -> Json<ApiResponse<Vec<AtHistoryItem>>> {
+    let history = state.at_history.clone();
     let history = history.read().await;
     let items = history.get_all();
     
